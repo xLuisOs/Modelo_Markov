@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import networkx as nx
+from datetime import datetime
 
 from markov import validate_transition_matrix, state_distribution_after_n_steps
 from utils import parse_states, read_matrix_csv
@@ -156,6 +157,20 @@ class App(ctk.CTk):
         )
         self.validate_btn.pack(fill="x", pady=(0, 8))
         
+        # NUEVO: Botón de exportar diagrama
+        self.export_btn = ctk.CTkButton(
+            actions_frame,
+            text="📊 Exportar Diagrama",
+            command=self.export_diagram,
+            height=38,
+            corner_radius=10,
+            fg_color=COLORS['primary_blue'],
+            hover_color=COLORS['hover_blue'],
+            font=ctk.CTkFont(size=13),
+            text_color=COLORS['text_dark']
+        )
+        self.export_btn.pack(fill="x", pady=(0, 8))
+        
         self.reset_btn = ctk.CTkButton(
             actions_frame,
             text="Reiniciar",
@@ -217,7 +232,7 @@ class App(ctk.CTk):
             anchor="w"
         ).grid(row=0, column=0, sticky="w", padx=20, pady=(15, 10))
         
-                # Crear un canvas con scroll horizontal
+        # Crear un canvas con scroll horizontal
         self.matrix_canvas = tk.Canvas(
             matrix_panel,
             bg="white",
@@ -266,36 +281,28 @@ class App(ctk.CTk):
             results_panel,
             fg_color="#f8f8f8",
             corner_radius=8,
-            height=250  # altura fija en píxeles; ajusta a tu gusto
+            height=250
         )
-        # Evitar que el frame cambie su tamaño en respuesta al contenido
         text_container.grid(row=1, column=0, sticky="nsew", padx=15, pady=(0, 10))
-        text_container.grid_propagate(False)  # <-- clave: no dejar que el contenido cambie el tamaño
+        text_container.grid_propagate(False)
 
-        # Asegurarse de que la fila que contiene el text_container no "estire"
-        # results_panel.grid_rowconfigure(1, weight=0)  # opcional si ya configuraste antes; puede añadirse
-
-        # Crear un Text con fuente grande, pero sin que el contenedor cambie de tamaño
         self.output_text = tk.Text(
             text_container,
             bg="#f8f8f8",
             fg=COLORS['text_dark'],
             insertbackground=COLORS['accent_orange'],
-            font=("Consolas", 14),  # tamaño de letra más grande
+            font=("Consolas", 14),
             relief="flat",
             padx=12,
             pady=12,
             wrap="word"
         )
-        # Colocamos el text dentro del frame fijo y lo expandimos para llenar el espacio interior
         self.output_text.grid(row=0, column=0, sticky="nsew")
 
-        # Opcional: si querés scroll vertical dentro del cuadro sin agrandar el contenedor
         y_scroll = tk.Scrollbar(text_container, orient="vertical", command=self.output_text.yview)
         y_scroll.grid(row=0, column=1, sticky="ns", padx=(0,4), pady=4)
         self.output_text.configure(yscrollcommand=y_scroll.set)
 
-        # Aseguramos que el text ocupe su celda correctamente
         text_container.grid_rowconfigure(0, weight=1)
         text_container.grid_columnconfigure(0, weight=1)
 
@@ -308,6 +315,9 @@ class App(ctk.CTk):
         self.ax = self.fig.add_subplot(111, facecolor='#f8f8f8')
         self.canvas = FigureCanvasTkAgg(self.fig, master=graph_container)
         self.canvas.get_tk_widget().pack(fill="both", expand=True, padx=5, pady=5)
+        
+        # Variable para saber si hay un gráfico generado
+        self.has_graph = False
         
         # Inicializar
         self.generate_matrix_inputs()
@@ -442,6 +452,56 @@ class App(ctk.CTk):
         self.ax.clear()
         self.ax.set_facecolor('#f8f8f8')
         self.canvas.draw()
+        self.has_graph = False
+
+    def export_diagram(self):
+        """Exporta el diagrama actual a un archivo de imagen"""
+        if not self.has_graph:
+            messagebox.showwarning(
+                "Aviso",
+                "Primero debes calcular y generar un diagrama antes de exportarlo."
+            )
+            return
+        
+        # Solicitar al usuario dónde guardar el archivo
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        default_filename = f"markov_diagrama_{timestamp}.png"
+        
+        filepath = filedialog.asksaveasfilename(
+            defaultextension=".png",
+            initialfile=default_filename,
+            filetypes=[
+                ("PNG Image", "*.png"),
+                ("PDF Document", "*.pdf"),
+                ("SVG Vector", "*.svg"),
+                ("JPEG Image", "*.jpg"),
+                ("All Files", "*.*")
+            ],
+            title="Guardar diagrama como..."
+        )
+        
+        if not filepath:
+            return  # Usuario canceló
+        
+        try:
+            # Guardar la figura en alta resolución
+            self.fig.savefig(
+                filepath,
+                dpi=300,
+                bbox_inches='tight',
+                facecolor='#f8f8f8',
+                edgecolor='none',
+                pad_inches=0.2
+            )
+            messagebox.showinfo(
+                "✓ Éxito",
+                f"Diagrama exportado exitosamente en:\n{filepath}"
+            )
+        except Exception as e:
+            messagebox.showerror(
+                "Error al exportar",
+                f"No se pudo guardar el diagrama:\n{str(e)}"
+            )
 
     def on_calculate(self):
         try:
@@ -752,6 +812,7 @@ class App(ctk.CTk):
             self.ax.set_ylim(-3.2, 3.2)
             
             self.canvas.draw()
+            self.has_graph = True  # Marcar que hay un gráfico válido
 
         except Exception as e:
             messagebox.showerror("Error", str(e))
